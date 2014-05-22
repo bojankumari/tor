@@ -42,6 +42,7 @@ module user_logic
     parameter C_M_AXIS_TUSER_WIDTH=128,
     parameter C_S_AXIS_TUSER_WIDTH=128,
     parameter C_S_AXI_DATA_WIDTH=32,
+    parameter NUM_QUEUES=5,
     // Register parameters
     parameter NUM_RW_REGS = 0,
     parameter NUM_WO_REGS = 0,
@@ -84,6 +85,20 @@ module user_logic
       end
    endfunction // log2
 
+   // ------------ Internal Params --------
+
+   localparam NUM_QUEUES_WIDTH = log2(NUM_QUEUES);
+
+   localparam BUFFER_SIZE         = 32768; // Buffer size 4096B
+   localparam BUFFER_SIZE_WIDTH   = log2(BUFFER_SIZE/(C_M_AXIS_DATA_WIDTH/8));
+   //localparam BUFFER_SIZE_WIDTH   = BUFFER_SIZE/(C_M_AXIS_DATA_WIDTH/8);
+
+   localparam MAX_PACKET_SIZE = 1600;
+   localparam BUFFER_THRESHOLD = (BUFFER_SIZE-MAX_PACKET_SIZE)/(C_M_AXIS_DATA_WIDTH/8);
+
+
+
+
    // ------------- Regs/ wires -----------
 
    wire                             in_fifo_nearly_full;
@@ -92,9 +107,26 @@ module user_logic
    wire [C_M_AXIS_TUSER_WIDTH-1:0]  fifo_out_tuser;
    wire [C_M_AXIS_DATA_WIDTH-1:0]   fifo_out_tdata;
    wire [C_M_AXIS_DATA_WIDTH/8-1:0] fifo_out_tstrb;
-   wire  	                        fifo_out_tlast;
+   wire [NUM_QUEUES-1:0] 	    fifo_out_tlast;
    wire                             fifo_tvalid;
    wire                             fifo_tlast;
+
+   reg [NUM_QUEUES-1:0]                nearly_full;
+   wire [NUM_QUEUES-1:0]               nearly_full_fifo;
+   wire [NUM_QUEUES-1:0]               empty;
+
+   reg [NUM_QUEUES-1:0]                metadata_nearly_full;
+   wire [NUM_QUEUES-1:0]               metadata_nearly_full_fifo;
+   wire [NUM_QUEUES-1:0]               metadata_empty;
+
+   wire [NUM_QUEUES-1:0]               rd_en;
+   reg [NUM_QUEUES-1:0]                wr_en;
+
+   reg [NUM_QUEUES-1:0]                metadata_rd_en;
+   reg [NUM_QUEUES-1:0]                metadata_wr_en;
+
+
+
 
    // ------------ Modules -------------
 
@@ -153,19 +185,10 @@ module user_logic
          .rd_en                          (metadata_rd_en[i]),
          .reset                          (~axi_resetn),
          .clk                            (axi_aclk));
-
-
-
-
-
+	end
+     endgenerate	
 
    // ------------- Logic ------------
-
-
-
-
-
-
 
 
    assign s_axis_tready = !in_fifo_nearly_full;
